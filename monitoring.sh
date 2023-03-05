@@ -1,46 +1,32 @@
 #!/bin/bash
 
-while true
-do
-  # Get system information
-  architecture=$(uname -m)
-  kernel_version=$(uname -r)
-  num_physical_cpus=$(grep -c "^processor" /proc/cpuinfo)
-  num_virtual_cpus=$(grep -c "^processor" /proc/cpuinfo)
-  mem_total=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-  mem_free=$(grep MemFree /proc/meminfo | awk '{print $2}')
-  mem_utilization=$(echo "scale=2;100-($mem_free/$mem_total*100)" | bc)
-  cpu_utilization=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')
-  last_reboot=$(who -b | awk '{print $3,$4}')
-  lvm_status=$(systemctl status lvm2-lvmetad.service | grep "Active:" | awk '{print $2}')
-  num_connections=$(netstat -an | grep -c | wc -l)
-  num_users=$(who | wc -l)
-  ipv4_address=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}')
-  mac_address=$(ip addr show | grep 'link/ether' | awk '{print $2}')
-  num_sudo_cmds=$(grep -c "sudo:" /var/log/auth.log)
+#Make sure to install sysstat via `sudo apt install sysstat`
+#Make sure to install bc via `sudo apt install bc`
+#Make sure to write the path to the sudo log files you created in last line instead of `/var/log/sudo/sudo_logs`
 
-  # Display information to all terminals
-  ```
-  echo "=================================================" | wall
-  ```
-  echo "System Information:" | wall
-  echo "Architecture: $architecture" | wall
-  echo "Kernel Version: $kernel_version" | wall
-  echo "Number of Physical CPUs: $num_physical_cpus" | wall
-  echo "Number of Virtual CPUs: $num_virtual_cpus" | wall
-  echo "RAM Total: $mem_total kB" | wall
-  echo "RAM Free: $mem_free kB" | wall
-  echo "RAM Utilization Rate: $mem_utilization %" | wall
-  echo "CPU Utilization Rate: $cpu_utilization" | wall
-  echo "Last Reboot: $last_reboot" | wall
-  echo "LVM Status: $lvm_status" | wall
-  echo "Numberof Active Connections: $num_connections" | wall
-  echo "Number of Users: $num_users" | wall
-  echo "IPv4 Address: $ipv4_address" | wall
-  echo "MAC Address: $mac_address" | wall
-  echo "Number of sudo Commands: $num_sudo_cmds" | wall
+THREADS=$(lscpu | egrep 'Thread|Core|Socket|^CPU' | awk '{if(NR == 3) print $NF}')
+CORES=$(lscpu | egrep 'Thread|Core|Socket|^CPU' | awk '{if(NR == 4) print $NF}')
+SOCKETS=$(lscpu | egrep 'Thread|Core|Socket|^CPU' | awk '{if(NR == 5) print $NF}')
 
-  # Wait for 10 minutes before displaying information again
-  sleep 600
-done
-```
+TOTAL_MEMORY=$(vmstat -s | awk '{if(NR == 1) print$1}')
+USED_MEMORY=$(vmstat -s | awk '{if(NR == 2) print$1}')
+USED_MEMORY_PERCENT=$(expr $USED_MEMORY \* 100 / $TOTAL_MEMORY)
+
+CPU_IDLE=$(mpstat | awk 'END{print $NF}')
+
+TOTAL_DISK_SIZE=$(df -h --total --output=size| awk 'END{print$NF}')
+USED_DISK_SIZE=$(df -h --total --output=used | awk 'END{print$NF}')
+USED_DISK_PERCENT=$(df -h --total | awk 'END{print$(NF - 1)}')
+
+printf "#Architecture: `uname -a` \n"
+printf "#CPU physical: `nproc` \n"
+printf "#vCPU: `expr $THREADS \* $CORES \* $SOCKETS` \n"
+printf "#Memory Usage: `expr $USED_MEMORY / 1024`/`expr $TOTAL_MEMORY / 1024`MB ($USED_MEMORY_PERCENT%%) \n"
+printf "#Disk Usage: $USED_DISK_SIZE/$TOTAL_DISK_SIZE ($USED_DISK_PERCENT%)\n"
+printf "#CPU Load: `echo 100 - $CPU_IDLE | bc`%% \n"
+printf "#Last Boot: `who -b | awk '{print $(NF - 1), $NF}'` \n"
+printf "#LVM use: yes \n"
+printf "#Connexions TCP: `netstat -ant | grep ESTABLISHED | wc -l` ESTABLISHED \n"
+printf "#User Log: `who | wc -l` \n"
+printf "#Network: IP `hostname -I` (`ip addr | grep link/ether | awk '{print $(NF -2)}'`) \n"
+printf "#Sudo: `cat /var/log/sudo/sudo_logs | grep COMMAND | wc -l` cmd" 
