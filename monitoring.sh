@@ -44,11 +44,3 @@ do
   sleep 600
 done
 ```
-
-# This script uses various commands to gather system information and then displays it using the "wall" command which sends a message to all logged-in users. The script runs in an infinite loop, waiting for 10 minutes between each display of information.
-
-You can modify the script to add a banner by adding an extra `echo` statement before the information is displayed. For example, you could add the following line before the first `echo` statement to display a banner:
-
-```
-echo "===================================" | wall
-```
